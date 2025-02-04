@@ -1,0 +1,7 @@
+# ninja log v5
+2	23	0	C:/Users/njcor/Documents/CODE/traffiq/TraffiQ/traffiqFrontend/android/app/.cxx/Debug/1f4p516y/x86_64/CMakeFiles/cmake.verify_globs	e6054746b81910e4
+0	3155	7603336919063418	CMakeFiles/appmodules.dir/0881ed68760a29a173a8a1868fcf899a/traffiqFrontend/android/app/build/generated/autolinking/src/main/jni/autolinking.cpp.o	ec96bdb3decafeb3
+4	3397	7603336921509197	CMakeFiles/appmodules.dir/OnLoad.cpp.o	33dae252202831dc
+3397	3544	7603336923127962	C:/Users/njcor/Documents/CODE/traffiq/TraffiQ/traffiqFrontend/android/app/build/intermediates/cxx/Debug/1f4p516y/obj/x86_64/libappmodules.so	221279ee8896d894
+3	23	0	C:/Users/njcor/Documents/CODE/traffiq/TraffiQ/traffiqFrontend/android/app/.cxx/Debug/1f4p516y/x86_64/CMakeFiles/cmake.verify_globs	e6054746b81910e4
+3	24	0	C:/Users/njcor/Documents/CODE/traffiq/TraffiQ/traffiqFrontend/android/app/.cxx/Debug/1f4p516y/x86_64/CMakeFiles/cmake.verify_globs	e6054746b81910e4
