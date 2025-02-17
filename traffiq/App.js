@@ -1,8 +1,12 @@
 import React from 'react';
-import BottomTabNavigator from './src/navigation/BottomTabNavigator';
+import { SafeAreaView, StatusBar } from 'react-native';
+import RootNavigator from './src/navigation/RootNavigator';
 
-const App = () => {
-  return <BottomTabNavigator />;
-};
-
-export default App;
+export default function App() {
+  return (
+    <SafeAreaView style={{ flex: 1 }}>
+      <StatusBar barStyle="dark-content" />
+      <RootNavigator />
+    </SafeAreaView>
+  );
+}
