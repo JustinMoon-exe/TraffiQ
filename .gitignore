@@ -6,24 +6,24 @@ traffiq-backend/*.log
 traffiq-backend/.vscode
 
 # React Native Frontend
-traffiq-frontend/node_modules/
-traffiq-frontend/.bundle/
-traffiq-frontend/android/build/
-traffiq-frontend/ios/build/
-traffiq-frontend/ios/Pods/
-traffiq-frontend/ios/Podfile.lock
-traffiq-frontend/.generated
-traffiq-frontend/*.log
-traffiq-frontend/android/.gradle/
-traffiq-frontend/android/.cxx/
-traffiq-frontend/ios/.generated
-traffiq-frontend/ios/xcuserdata/
+traffiq/node_modules/
+traffiq/.bundle/
+traffiqandroid/build/
+traffiq/ios/build/
+traffiq/ios/Pods/
+traffiq/ios/Podfile.lock
+traffiq/.generated
+traffiq/*.log
+traffiq/android/.gradle/
+traffiq/android/.cxx/
+traffiq/ios/.generated
+traffiq/ios/xcuserdata/
 
 # More Specific Android Ignores
-traffiq-frontend/android/app/build/
-traffiq-frontend/android/app/build/*
-traffiq-frontend/android/app/build/**/*
-traffiq-frontend/android/app/build/**/**/*
+traffiq/android/app/build/
+traffiq/android/app/build/*
+traffiq/android/app/build/**/*
+traffiq/android/app/build/**/**/*
 
 
 # OS or editor generated files
