@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -7,7 +7,6 @@ import {
   ActivityIndicator, 
   TouchableOpacity, 
   Alert,
-  FlatList,
   ScrollView
 } from 'react-native';
 import MapView, { Marker, Region } from 'react-native-maps';
@@ -16,27 +15,11 @@ import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-// Define a type for coordinates
-type Coordinates = { latitude: number; longitude: number };
-
-// Define your navigation parameters
-type RootStackParamList = {
-  MapScreen: { destination?: string };
-  Navigation: {
-    mode: string;
-    startCoords: Coordinates;
-    destinationCoords: Coordinates;
-    travelTime: number; // in minutes
-    destination: string;
-    startAddress: string;
-  };
-};
+import { RootStackParamList, Coordinates } from '../types/types';
 
 type MapScreenRouteProp = RouteProp<RootStackParamList, 'MapScreen'>;
 type MapScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MapScreen'>;
 
-// Modes
 const TRANSPORT_MODES: Array<"DRIVING" | "WALKING" | "TRANSIT"> = ["DRIVING", "WALKING", "TRANSIT"];
 const API_KEY = "AIzaSyBrsklzWqQijkHVivtGeYLUaXdXKVO6XIw";
 
@@ -52,10 +35,9 @@ const MapScreen = () => {
   const [error, setError] = useState<string | null>(null);
   const [isLocationLocked, setIsLocationLocked] = useState(false);
 
-  // Selected mode and related states
   const [selectedMode, setSelectedMode] = useState<"DRIVING" | "WALKING" | "TRANSIT">("DRIVING");
-  const [directionsSteps, setDirectionsSteps] = useState<any[]>([]);
   const [travelTimes, setTravelTimes] = useState<{ [key in "DRIVING" | "WALKING" | "TRANSIT"]?: number }>({});
+  const [directionsSteps, setDirectionsSteps] = useState<any[]>([]);
 
   const initialDestination = route.params?.destination || '';
   console.log("[MapScreen] initialDestination:", initialDestination);
@@ -65,87 +47,75 @@ const MapScreen = () => {
     let subscription: Location.LocationSubscription;
     const startWatching = async () => {
       try {
-        console.log("[Location] Requesting permissions...");
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
           setError('Location permission denied');
           return;
         }
-        console.log("[Location] Permissions granted. Starting location watch...");
         subscription = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.High,
-            timeInterval: 5000,
-            distanceInterval: 10,
+            timeInterval: 3000,
+            distanceInterval: 5,
           },
           (location) => {
-            const coords = { latitude: location.coords.latitude, longitude: location.coords.longitude };
-            console.log("[Location] New location:", coords);
+            const coords = {
+              latitude: location.coords.latitude,
+              longitude: location.coords.longitude,
+            };
             setStartCoords(coords);
             if (isLocationLocked && mapRef.current) {
-              const region: Region = { ...coords, latitudeDelta: 0.01, longitudeDelta: 0.01 };
+              const region: Region = { ...coords, latitudeDelta: 0.005, longitudeDelta: 0.005 };
               mapRef.current.animateToRegion(region, 1000);
             }
           }
         );
-        // Get the initial location
         const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-        const coords = { latitude: location.coords.latitude, longitude: location.coords.longitude };
-        console.log("[Location] Initial location:", coords);
+        const coords = {
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        };
         setStartCoords(coords);
         const reverse = await Location.reverseGeocodeAsync(coords);
-        console.log("[Location] Reverse geocode:", reverse);
         setStartAddress(
           reverse[0]?.street ? `${reverse[0].street}, ${reverse[0].city}` : 'My Location'
         );
       } catch (err) {
-        console.error("[Location] Error:", err);
-        setError('Failed to get current location');
+        console.error("Location error:", err);
+        setError("Failed to get current location");
       }
     };
 
     startWatching();
     return () => {
       if (subscription) {
-        console.log("[Location] Unsubscribing from location updates");
         subscription.remove();
       }
     };
   }, [isLocationLocked]);
 
-  // Fetch destination coordinates once
+  // Fetch destination coordinates
   useEffect(() => {
     const fetchDestination = async () => {
       if (!initialDestination) {
-        console.log("[fetchDestination] No destination provided.");
         setLoading(false);
         return;
       }
       try {
-        console.log("[fetchDestination] Fetching destination for:", initialDestination);
         setLoading(true);
         const response = await fetch(
           `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(initialDestination)}&key=${API_KEY}`
         );
-        console.log("[fetchDestination] Response status:", response.status);
         if (!response.ok) throw new Error('Destination lookup failed');
         const data = await response.json();
-        console.log("[fetchDestination] Data received:", data);
         if (data.results?.[0]?.geometry?.location) {
           const { lat, lng } = data.results[0].geometry.location;
-          console.log("[fetchDestination] Setting destinationCoords:", { latitude: lat, longitude: lng });
           setDestinationCoords({ latitude: lat, longitude: lng });
-        } else {
-          console.log("[fetchDestination] No geometry.location found.");
-          setError('Invalid destination - no results');
-          Alert.alert('Error', 'Could not find this location');
         }
       } catch (err) {
-        console.error("[fetchDestination] Destination error:", err);
         setError('Invalid destination');
         Alert.alert('Error', 'Could not find this location');
       } finally {
-        console.log("[fetchDestination] Setting loading to false.");
         setLoading(false);
       }
     };
@@ -153,79 +123,57 @@ const MapScreen = () => {
     fetchDestination();
   }, [initialDestination]);
 
-  // Fetch directions whenever mode or coordinates change
-  useEffect(() => {
-    const fetchDirections = async () => {
-      if (!startCoords || !destinationCoords) {
-        console.log("[fetchDirections] Missing coordinates:", { startCoords, destinationCoords });
-        return;
+  // Define a function to fetch directions so it can be called on interval
+  const fetchDirections = useCallback(async () => {
+    if (!startCoords || !destinationCoords) return;
+    try {
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/directions/json?origin=${startCoords.latitude},${startCoords.longitude}&destination=${destinationCoords.latitude},${destinationCoords.longitude}&mode=${selectedMode.toLowerCase()}&key=${API_KEY}`
+      );
+      if (!response.ok) return;
+      const data = await response.json();
+      if (data.routes?.[0]?.legs?.[0]?.steps) {
+        setDirectionsSteps(data.routes[0].legs[0].steps);
+      } else {
+        setDirectionsSteps([]);
       }
-      try {
-        console.log("[fetchDirections] Fetching directions with mode:", selectedMode);
-        const response = await fetch(
-          `https://maps.googleapis.com/maps/api/directions/json?origin=${startCoords.latitude},${startCoords.longitude}&destination=${destinationCoords.latitude},${destinationCoords.longitude}&mode=${selectedMode.toLowerCase()}&key=${API_KEY}`
-        );
-        console.log("[fetchDirections] Response status:", response.status);
-        if (!response.ok) {
-          console.error("[fetchDirections] Response not OK");
-          return;
-        }
-        const data = await response.json();
-        console.log("[fetchDirections] Data received:", data);
-        if (data.routes?.[0]?.legs?.[0]?.steps) {
-          console.log("[fetchDirections] Setting directionsSteps with", data.routes[0].legs[0].steps.length, "steps");
-          setDirectionsSteps(data.routes[0].legs[0].steps);
-        } else {
-          console.log("[fetchDirections] No steps found.");
-          setDirectionsSteps([]);
-        }
-      } catch (err) {
-        console.error("[fetchDirections] Directions error:", err);
-      }
-    };
+    } catch (err) {
+      console.error("Directions error:", err);
+    }
+  }, [startCoords, destinationCoords, selectedMode]);
 
-    fetchDirections();
-  }, [selectedMode, startCoords, destinationCoords]);
+  // Poll for directions every 5 seconds
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetchDirections();
+    }, 5000);
+    return () => clearInterval(intervalId);
+  }, [fetchDirections]);
 
   // Fetch travel times for each mode
   useEffect(() => {
     const fetchTravelTimeForMode = async (mode: "DRIVING" | "WALKING" | "TRANSIT") => {
-      if (!startCoords || !destinationCoords) {
-        console.log(`[fetchTravelTimeForMode] Missing coords for mode ${mode}.`);
-        return;
-      }
+      if (!startCoords || !destinationCoords) return;
       try {
-        console.log(`[fetchTravelTimeForMode] Fetching travel time for mode: ${mode}`);
         const response = await fetch(
           `https://maps.googleapis.com/maps/api/directions/json?origin=${startCoords.latitude},${startCoords.longitude}&destination=${destinationCoords.latitude},${destinationCoords.longitude}&mode=${mode.toLowerCase()}&key=${API_KEY}`
         );
-        console.log(`[fetchTravelTimeForMode] Response status for ${mode}:`, response.status);
-        if (!response.ok) {
-          console.error(`[fetchTravelTimeForMode] Response not OK for mode: ${mode}`);
-          return;
-        }
+        if (!response.ok) return;
         const data = await response.json();
-        console.log(`[fetchTravelTimeForMode] Data received for mode ${mode}:`, data);
         const duration = data.routes?.[0]?.legs?.[0]?.duration?.value;
-        console.log(`[fetchTravelTimeForMode] Duration for ${mode}:`, duration);
-        return duration;
+        return duration; // seconds
       } catch (err) {
-        console.error(`[fetchTravelTimeForMode] Error for mode ${mode}:`, err);
+        console.error(`Travel time error for ${mode}:`, err);
         return undefined;
       }
     };
 
     const fetchAllTravelTimes = async () => {
       const times: { [key in "DRIVING" | "WALKING" | "TRANSIT"]?: number } = {};
-      await Promise.all(
-        TRANSPORT_MODES.map(async (mode) => {
-          const time = await fetchTravelTimeForMode(mode);
-          if (time !== undefined) {
-            times[mode] = time;
-          }
-        })
-      );
-      console.log("[fetchAllTravelTimes] Setting travelTimes:", times);
+      for (const mode of TRANSPORT_MODES) {
+        const t = await fetchTravelTimeForMode(mode);
+        if (t !== undefined) times[mode] = t;
+      }
       setTravelTimes(times);
     };
 
@@ -233,7 +181,6 @@ const MapScreen = () => {
   }, [startCoords, destinationCoords]);
 
   if (error) {
-    console.log("[MapScreen] Error encountered:", error);
     return (
       <SafeAreaView style={styles.errorContainer}>
         <Text style={styles.errorText}>{error}</Text>
@@ -245,7 +192,6 @@ const MapScreen = () => {
   }
 
   if (loading || !startCoords || !destinationCoords) {
-    console.log("[MapScreen] Still loading or missing coords:", { loading, startCoords, destinationCoords });
     return (
       <SafeAreaView style={styles.loaderContainer}>
         <ActivityIndicator size="large" color="#6200EE" />
@@ -254,73 +200,44 @@ const MapScreen = () => {
     );
   }
 
-  // Determine mode colors based on travel times
+  // Tighter zoom region
+  const region: Region = {
+    latitude: startCoords.latitude,
+    longitude: startCoords.longitude,
+    latitudeDelta: 0.005,
+    longitudeDelta: 0.005,
+  };
+
+  // Center map handler
+  const centerMap = () => {
+    if (mapRef.current) {
+      mapRef.current.animateToRegion(region, 1000);
+    }
+  };
+
+  // Determine color coding based on travel times (fastest = green, medium = yellow, slowest = red)
   const modeColors: { [key in "DRIVING" | "WALKING" | "TRANSIT"]?: string } = {};
   if (
-    travelTimes["DRIVING"] !== undefined &&
-    travelTimes["WALKING"] !== undefined &&
-    travelTimes["TRANSIT"] !== undefined
+    travelTimes.DRIVING !== undefined &&
+    travelTimes.WALKING !== undefined &&
+    travelTimes.TRANSIT !== undefined
   ) {
     const sorted = TRANSPORT_MODES.slice().sort((a, b) => (travelTimes[a]! - travelTimes[b]!));
-    modeColors[sorted[0]] = '#4CAF50'; // fastest
-    modeColors[sorted[1]] = '#FFC107'; // medium
-    modeColors[sorted[2]] = '#F44336'; // slowest
-    console.log("[MapScreen] Mode colors determined:", modeColors);
-  } else {
-    console.log("[MapScreen] Incomplete travel times; cannot determine mode colors.");
+    modeColors[sorted[0]] = '#4CAF50';
+    modeColors[sorted[1]] = '#FFC107';
+    modeColors[sorted[2]] = '#F44336';
   }
 
-  // Render mode selection buttons
-  const renderModeButtons = () => (
-    <View style={styles.modeButtonsContainer}>
-      {TRANSPORT_MODES.map((mode) => (
-        <TouchableOpacity
-          key={mode}
-          style={[
-            styles.modeButton,
-            selectedMode === mode && styles.modeButtonSelected,
-            { backgroundColor: modeColors[mode] || '#ddd' }
-          ]}
-          onPress={() => {
-            console.log(`[Mode Button] Setting selected mode to ${mode}`);
-            setSelectedMode(mode);
-          }}
-        >
-          <Text style={[styles.modeButtonText, selectedMode === mode && styles.modeButtonTextSelected]}>
-            {mode}
-          </Text>
-          {travelTimes[mode] !== undefined && (
-            <Text style={styles.modeTimeText}>
-              {Math.round(travelTimes[mode]! / 60)} min
-            </Text>
-          )}
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-
-  // Render turn-by-turn directions (FlatList wrapped in a fixed-height container)
-  const renderDirectionStep = ({ item, index }: { item: any; index: number }) => (
-    <View style={styles.stepContainer}>
-      <Text style={styles.stepIndex}>{index + 1}.</Text>
-      <View style={styles.stepDetails}>
-        <Text style={styles.stepInstruction}>{item.html_instructions.replace(/<[^>]+>/g, '')}</Text>
-        <Text style={styles.stepMeta}>{item.distance?.text} | {item.duration?.text}</Text>
-      </View>
-    </View>
-  );
-
-  // Handle navigation to the live Navigation screen
+  // Start Navigation button handler
   const handleStartNavigation = () => {
-    if (!startCoords || !destinationCoords) return;
     const selectedTravelTime = travelTimes[selectedMode];
     if (!selectedTravelTime) {
-      Alert.alert('Error', 'Travel time not available for the selected mode.');
+      Alert.alert('Error', 'Travel time not available for selected mode.');
       return;
     }
     navigation.navigate('Navigation', {
       mode: selectedMode,
-      startCoords, // Ensure coords are properly serialized
+      startCoords,
       destinationCoords,
       travelTime: Math.round(selectedTravelTime / 60),
       destination: initialDestination,
@@ -328,17 +245,41 @@ const MapScreen = () => {
     });
   };
 
+  // Save Route button handler
+  const handleSaveRoute = async () => {
+    const newRoute = {
+      startAddress,
+      destination: initialDestination,
+      mode: selectedMode,
+      travelTime: Math.round((travelTimes[selectedMode] || 0) / 60),
+      timestamp: new Date().toISOString(),
+    };
+    try {
+      const storedRoutes = await AsyncStorage.getItem('savedRoutes');
+      const savedRoutes = storedRoutes ? JSON.parse(storedRoutes) : [];
+      savedRoutes.push(newRoute);
+      await AsyncStorage.setItem('savedRoutes', JSON.stringify(savedRoutes));
+      Alert.alert('Success', 'Route saved successfully!');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save route');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Top Bar */}
       <SafeAreaView style={styles.topBar}>
-        <Text style={styles.topBarText}>Current Mode: {selectedMode}</Text>
-        <TouchableOpacity onPress={() => setIsLocationLocked(!isLocationLocked)}>
-          <Text style={styles.topBarText}>{isLocationLocked ? 'Unlock Map' : 'Lock Map'}</Text>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Text style={styles.backButtonText}>Back</Text>
+        </TouchableOpacity>
+        <View style={styles.infoContainer}>
+          <Text style={styles.topBarText}>Current Mode: {selectedMode}</Text>
+        </View>
+        <TouchableOpacity style={styles.centerButton} onPress={centerMap}>
+          <Text style={styles.centerButtonText}>Center</Text>
         </TouchableOpacity>
       </SafeAreaView>
 
-      {/* Main Content */}
       <ScrollView contentContainerStyle={styles.contentContainer}>
         {/* Address Inputs */}
         <View style={styles.addressContainer}>
@@ -362,11 +303,7 @@ const MapScreen = () => {
           <MapView
             ref={mapRef}
             style={styles.map}
-            initialRegion={{
-              ...startCoords,
-              latitudeDelta: 0.0922,
-              longitudeDelta: 0.0421,
-            }}
+            region={region}
             showsUserLocation={true}
             followsUserLocation={isLocationLocked}
           >
@@ -381,25 +318,41 @@ const MapScreen = () => {
               strokeColor="#6200EE"
             />
           </MapView>
+          {/* Floating Camera Center Button */}
+          <TouchableOpacity style={styles.floatingCenterButton} onPress={centerMap}>
+            <Text style={styles.floatingCenterButtonText}>⦿</Text>
+          </TouchableOpacity>
         </View>
         {/* Mode Selection */}
-        {renderModeButtons()}
-        {/* Directions List */}
-        <View style={styles.directionsContainer}>
-          <Text style={styles.directionsHeader}>Turn-by-Turn Directions</Text>
-          <View style={{ height: 200 }}>
-            <FlatList
-              data={directionsSteps}
-              keyExtractor={(_, index) => index.toString()}
-              renderItem={renderDirectionStep}
-              nestedScrollEnabled={true}
-            />
-          </View>
+        <View style={styles.modeButtonsContainer}>
+          {TRANSPORT_MODES.map((mode) => (
+            <TouchableOpacity
+              key={mode}
+              style={[
+                styles.modeButton,
+                selectedMode === mode && styles.modeButtonSelected,
+                { backgroundColor: mode === selectedMode ? modeColors[mode] || '#6200EE' : '#ddd' },
+              ]}
+              onPress={() => setSelectedMode(mode)}
+            >
+              <Text style={[styles.modeButtonText, selectedMode === mode && styles.modeButtonTextSelected]}>
+                {mode}
+              </Text>
+              {travelTimes[mode] !== undefined && (
+                <Text style={styles.modeTimeText}>{Math.round(travelTimes[mode]! / 60)} min</Text>
+              )}
+            </TouchableOpacity>
+          ))}
         </View>
-        {/* Start Navigation Button */}
-        <TouchableOpacity style={styles.startButton} onPress={handleStartNavigation}>
-          <Text style={styles.startButtonText}>Start Navigation</Text>
-        </TouchableOpacity>
+        {/* Bottom Buttons */}
+        <View style={styles.bottomButtonsContainer}>
+          <TouchableOpacity style={styles.actionButton} onPress={handleStartNavigation}>
+            <Text style={styles.actionButtonText}>Start Navigation</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#4CAF50' }]} onPress={handleSaveRoute}>
+            <Text style={styles.actionButtonText}>Save Route</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -413,12 +366,19 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: 'rgba(98, 0, 238, 0.9)',
-    padding: 10,
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    zIndex: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    zIndex: 10,
   },
+  backButton: { padding: 8, backgroundColor: '#6200EE', borderRadius: 6 },
+  backButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+  infoContainer: { alignItems: 'center' },
   topBarText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  centerButton: { padding: 8, backgroundColor: '#fff', borderRadius: 6 },
+  centerButtonText: { color: '#6200EE', fontWeight: '600', fontSize: 14 },
   contentContainer: { paddingTop: 60, paddingHorizontal: 16, paddingBottom: 20 },
   addressContainer: { marginBottom: 10 },
   addressInput: {
@@ -432,48 +392,28 @@ const styles = StyleSheet.create({
   },
   mapContainer: { height: 300, borderRadius: 12, overflow: 'hidden', marginBottom: 10 },
   map: { flex: 1 },
-  modeButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginVertical: 10,
-  },
-  modeButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 20,
+  floatingCenterButton: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    backgroundColor: '#fff',
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
     alignItems: 'center',
-    width: 100,
+    elevation: 4,
   },
+  floatingCenterButtonText: { fontSize: 24, color: '#6200EE' },
+  modeButtonsContainer: { flexDirection: 'row', justifyContent: 'space-around', marginVertical: 10 },
+  modeButton: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 20, alignItems: 'center', width: 100 },
   modeButtonSelected: { borderWidth: 2, borderColor: '#333' },
   modeButtonText: { fontSize: 14, color: '#fff', fontWeight: '500' },
   modeButtonTextSelected: { color: '#fff' },
   modeTimeText: { fontSize: 12, color: '#fff', marginTop: 4 },
-  directionsContainer: { marginTop: 10 },
-  directionsHeader: { fontSize: 18, fontWeight: 'bold', marginBottom: 8, color: '#6200EE' },
-  stepContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 10,
-    backgroundColor: '#f0f0f0',
-    padding: 10,
-    borderRadius: 8,
-  },
-  stepIndex: { fontWeight: 'bold', marginRight: 8, fontSize: 16 },
-  stepDetails: { flex: 1 },
-  stepInstruction: { fontSize: 15, marginBottom: 4, color: '#333' },
-  stepMeta: { fontSize: 13, color: '#666' },
-  startButton: {
-    backgroundColor: '#6200EE',
-    padding: 16,
-    borderRadius: 8,
-    margin: 16,
-    alignItems: 'center',
-  },
-  startButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
+  bottomButtonsContainer: { flexDirection: 'row', justifyContent: 'space-around', marginVertical: 20 },
+  actionButton: { backgroundColor: '#6200EE', paddingVertical: 15, paddingHorizontal: 20, borderRadius: 8, flex: 1, marginHorizontal: 5, alignItems: 'center' },
+  actionButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 16, color: '#6200EE', fontSize: 16 },
   errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
