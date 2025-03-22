@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
   TextInput, 
   StyleSheet, 
   ActivityIndicator, 
-  ScrollView, 
   TouchableOpacity, 
   Alert,
-  FlatList
+  FlatList,
+  ScrollView
 } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, Region } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -27,95 +27,125 @@ type RootStackParamList = {
     mode: string;
     startCoords: Coordinates;
     destinationCoords: Coordinates;
-    travelTime: number;
+    travelTime: number; // in minutes
     destination: string;
     startAddress: string;
   };
 };
 
-// Route and navigation props for MapScreen
 type MapScreenRouteProp = RouteProp<RootStackParamList, 'MapScreen'>;
 type MapScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MapScreen'>;
 
-// Use uppercase mode values as expected by MapViewDirections
+// Modes
 const TRANSPORT_MODES: Array<"DRIVING" | "WALKING" | "TRANSIT"> = ["DRIVING", "WALKING", "TRANSIT"];
-
-// Define a constant for your API key (set this once and use it throughout)
 const API_KEY = "AIzaSyBrsklzWqQijkHVivtGeYLUaXdXKVO6XIw";
 
 const MapScreen = () => {
   const route = useRoute<MapScreenRouteProp>();
   const navigation = useNavigation<MapScreenNavigationProp>();
-
-  console.log("MapViewDirections:", MapViewDirections);
+  const mapRef = useRef<MapView>(null);
 
   const [startAddress, setStartAddress] = useState('');
   const [startCoords, setStartCoords] = useState<Coordinates | null>(null);
   const [destinationCoords, setDestinationCoords] = useState<Coordinates | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isLocationLocked, setIsLocationLocked] = useState(false);
 
-  // State for the selected transport mode (use uppercase values)
+  // Selected mode and related states
   const [selectedMode, setSelectedMode] = useState<"DRIVING" | "WALKING" | "TRANSIT">("DRIVING");
-  // State for turn-by-turn directions steps (if you choose to display them)
   const [directionsSteps, setDirectionsSteps] = useState<any[]>([]);
+  const [travelTimes, setTravelTimes] = useState<{ [key in "DRIVING" | "WALKING" | "TRANSIT"]?: number }>({});
 
-  // Retrieve destination from route params (if provided)
   const initialDestination = route.params?.destination || '';
+  console.log("[MapScreen] initialDestination:", initialDestination);
 
-  // Get current location
+  // Subscribe to live location updates
   useEffect(() => {
-    const getCurrentLocation = async () => {
+    let subscription: Location.LocationSubscription;
+    const startWatching = async () => {
       try {
-        console.log("Requesting location permissions...");
+        console.log("[Location] Requesting permissions...");
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
           setError('Location permission denied');
           return;
         }
-        console.log("Fetching current position...");
+        console.log("[Location] Permissions granted. Starting location watch...");
+        subscription = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.High,
+            timeInterval: 5000,
+            distanceInterval: 10,
+          },
+          (location) => {
+            const coords = { latitude: location.coords.latitude, longitude: location.coords.longitude };
+            console.log("[Location] New location:", coords);
+            setStartCoords(coords);
+            if (isLocationLocked && mapRef.current) {
+              const region: Region = { ...coords, latitudeDelta: 0.01, longitudeDelta: 0.01 };
+              mapRef.current.animateToRegion(region, 1000);
+            }
+          }
+        );
+        // Get the initial location
         const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
         const coords = { latitude: location.coords.latitude, longitude: location.coords.longitude };
-        console.log("Current position obtained:", coords);
+        console.log("[Location] Initial location:", coords);
         setStartCoords(coords);
         const reverse = await Location.reverseGeocodeAsync(coords);
-        console.log("Reverse geocode result:", reverse);
+        console.log("[Location] Reverse geocode:", reverse);
         setStartAddress(
           reverse[0]?.street ? `${reverse[0].street}, ${reverse[0].city}` : 'My Location'
         );
       } catch (err) {
-        console.error('Location error:', err);
+        console.error("[Location] Error:", err);
         setError('Failed to get current location');
       }
     };
-    getCurrentLocation();
-  }, []);
 
-  // Fetch destination coordinates
+    startWatching();
+    return () => {
+      if (subscription) {
+        console.log("[Location] Unsubscribing from location updates");
+        subscription.remove();
+      }
+    };
+  }, [isLocationLocked]);
+
+  // Fetch destination coordinates once
   useEffect(() => {
     const fetchDestination = async () => {
       if (!initialDestination) {
-        console.log("No destination provided.");
+        console.log("[fetchDestination] No destination provided.");
+        setLoading(false);
         return;
       }
       try {
+        console.log("[fetchDestination] Fetching destination for:", initialDestination);
         setLoading(true);
-        console.log("Fetching destination geocode for:", initialDestination);
         const response = await fetch(
           `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(initialDestination)}&key=${API_KEY}`
         );
+        console.log("[fetchDestination] Response status:", response.status);
         if (!response.ok) throw new Error('Destination lookup failed');
         const data = await response.json();
-        console.log("Destination geocode response:", data);
+        console.log("[fetchDestination] Data received:", data);
         if (data.results?.[0]?.geometry?.location) {
           const { lat, lng } = data.results[0].geometry.location;
+          console.log("[fetchDestination] Setting destinationCoords:", { latitude: lat, longitude: lng });
           setDestinationCoords({ latitude: lat, longitude: lng });
+        } else {
+          console.log("[fetchDestination] No geometry.location found.");
+          setError('Invalid destination - no results');
+          Alert.alert('Error', 'Could not find this location');
         }
       } catch (err) {
-        console.error('Destination error:', err);
+        console.error("[fetchDestination] Destination error:", err);
         setError('Invalid destination');
         Alert.alert('Error', 'Could not find this location');
       } finally {
+        console.log("[fetchDestination] Setting loading to false.");
         setLoading(false);
       }
     };
@@ -123,38 +153,87 @@ const MapScreen = () => {
     fetchDestination();
   }, [initialDestination]);
 
-  // Fetch detailed directions for the selected mode
+  // Fetch directions whenever mode or coordinates change
   useEffect(() => {
     const fetchDirections = async () => {
       if (!startCoords || !destinationCoords) {
-        console.log("Cannot fetch directions: missing coordinates");
+        console.log("[fetchDirections] Missing coordinates:", { startCoords, destinationCoords });
         return;
       }
       try {
-        console.log(`Fetching directions for mode: ${selectedMode}`);
+        console.log("[fetchDirections] Fetching directions with mode:", selectedMode);
         const response = await fetch(
           `https://maps.googleapis.com/maps/api/directions/json?origin=${startCoords.latitude},${startCoords.longitude}&destination=${destinationCoords.latitude},${destinationCoords.longitude}&mode=${selectedMode.toLowerCase()}&key=${API_KEY}`
         );
+        console.log("[fetchDirections] Response status:", response.status);
         if (!response.ok) {
-          console.log("Directions API call failed");
+          console.error("[fetchDirections] Response not OK");
           return;
         }
         const data = await response.json();
-        console.log("Fetched directions data:", data);
+        console.log("[fetchDirections] Data received:", data);
         if (data.routes?.[0]?.legs?.[0]?.steps) {
+          console.log("[fetchDirections] Setting directionsSteps with", data.routes[0].legs[0].steps.length, "steps");
           setDirectionsSteps(data.routes[0].legs[0].steps);
         } else {
+          console.log("[fetchDirections] No steps found.");
           setDirectionsSteps([]);
         }
       } catch (err) {
-        console.error('Directions error:', err);
+        console.error("[fetchDirections] Directions error:", err);
       }
     };
 
     fetchDirections();
   }, [selectedMode, startCoords, destinationCoords]);
 
+  // Fetch travel times for each mode
+  useEffect(() => {
+    const fetchTravelTimeForMode = async (mode: "DRIVING" | "WALKING" | "TRANSIT") => {
+      if (!startCoords || !destinationCoords) {
+        console.log(`[fetchTravelTimeForMode] Missing coords for mode ${mode}.`);
+        return;
+      }
+      try {
+        console.log(`[fetchTravelTimeForMode] Fetching travel time for mode: ${mode}`);
+        const response = await fetch(
+          `https://maps.googleapis.com/maps/api/directions/json?origin=${startCoords.latitude},${startCoords.longitude}&destination=${destinationCoords.latitude},${destinationCoords.longitude}&mode=${mode.toLowerCase()}&key=${API_KEY}`
+        );
+        console.log(`[fetchTravelTimeForMode] Response status for ${mode}:`, response.status);
+        if (!response.ok) {
+          console.error(`[fetchTravelTimeForMode] Response not OK for mode: ${mode}`);
+          return;
+        }
+        const data = await response.json();
+        console.log(`[fetchTravelTimeForMode] Data received for mode ${mode}:`, data);
+        const duration = data.routes?.[0]?.legs?.[0]?.duration?.value;
+        console.log(`[fetchTravelTimeForMode] Duration for ${mode}:`, duration);
+        return duration;
+      } catch (err) {
+        console.error(`[fetchTravelTimeForMode] Error for mode ${mode}:`, err);
+        return undefined;
+      }
+    };
+
+    const fetchAllTravelTimes = async () => {
+      const times: { [key in "DRIVING" | "WALKING" | "TRANSIT"]?: number } = {};
+      await Promise.all(
+        TRANSPORT_MODES.map(async (mode) => {
+          const time = await fetchTravelTimeForMode(mode);
+          if (time !== undefined) {
+            times[mode] = time;
+          }
+        })
+      );
+      console.log("[fetchAllTravelTimes] Setting travelTimes:", times);
+      setTravelTimes(times);
+    };
+
+    fetchAllTravelTimes();
+  }, [startCoords, destinationCoords]);
+
   if (error) {
+    console.log("[MapScreen] Error encountered:", error);
     return (
       <SafeAreaView style={styles.errorContainer}>
         <Text style={styles.errorText}>{error}</Text>
@@ -166,12 +245,29 @@ const MapScreen = () => {
   }
 
   if (loading || !startCoords || !destinationCoords) {
+    console.log("[MapScreen] Still loading or missing coords:", { loading, startCoords, destinationCoords });
     return (
       <SafeAreaView style={styles.loaderContainer}>
         <ActivityIndicator size="large" color="#6200EE" />
         <Text style={styles.loadingText}>Finding best routes...</Text>
       </SafeAreaView>
     );
+  }
+
+  // Determine mode colors based on travel times
+  const modeColors: { [key in "DRIVING" | "WALKING" | "TRANSIT"]?: string } = {};
+  if (
+    travelTimes["DRIVING"] !== undefined &&
+    travelTimes["WALKING"] !== undefined &&
+    travelTimes["TRANSIT"] !== undefined
+  ) {
+    const sorted = TRANSPORT_MODES.slice().sort((a, b) => (travelTimes[a]! - travelTimes[b]!));
+    modeColors[sorted[0]] = '#4CAF50'; // fastest
+    modeColors[sorted[1]] = '#FFC107'; // medium
+    modeColors[sorted[2]] = '#F44336'; // slowest
+    console.log("[MapScreen] Mode colors determined:", modeColors);
+  } else {
+    console.log("[MapScreen] Incomplete travel times; cannot determine mode colors.");
   }
 
   // Render mode selection buttons
@@ -182,39 +278,68 @@ const MapScreen = () => {
           key={mode}
           style={[
             styles.modeButton,
-            selectedMode === mode && styles.modeButtonSelected
+            selectedMode === mode && styles.modeButtonSelected,
+            { backgroundColor: modeColors[mode] || '#ddd' }
           ]}
-          onPress={() => setSelectedMode(mode)}
+          onPress={() => {
+            console.log(`[Mode Button] Setting selected mode to ${mode}`);
+            setSelectedMode(mode);
+          }}
         >
-          <Text style={[
-            styles.modeButtonText,
-            selectedMode === mode && styles.modeButtonTextSelected
-          ]}>
+          <Text style={[styles.modeButtonText, selectedMode === mode && styles.modeButtonTextSelected]}>
             {mode}
           </Text>
+          {travelTimes[mode] !== undefined && (
+            <Text style={styles.modeTimeText}>
+              {Math.round(travelTimes[mode]! / 60)} min
+            </Text>
+          )}
         </TouchableOpacity>
       ))}
     </View>
   );
 
-  // Render turn-by-turn directions steps in a FlatList
+  // Render turn-by-turn directions (FlatList wrapped in a fixed-height container)
   const renderDirectionStep = ({ item, index }: { item: any; index: number }) => (
     <View style={styles.stepContainer}>
       <Text style={styles.stepIndex}>{index + 1}.</Text>
       <View style={styles.stepDetails}>
-        <Text style={styles.stepInstruction}>
-          {item.html_instructions.replace(/<[^>]+>/g, '')}
-        </Text>
-        <Text style={styles.stepMeta}>
-          {item.distance?.text} | {item.duration?.text}
-        </Text>
+        <Text style={styles.stepInstruction}>{item.html_instructions.replace(/<[^>]+>/g, '')}</Text>
+        <Text style={styles.stepMeta}>{item.distance?.text} | {item.duration?.text}</Text>
       </View>
     </View>
   );
 
+  // Handle navigation to the live Navigation screen
+  const handleStartNavigation = () => {
+    if (!startCoords || !destinationCoords) return;
+    const selectedTravelTime = travelTimes[selectedMode];
+    if (!selectedTravelTime) {
+      Alert.alert('Error', 'Travel time not available for the selected mode.');
+      return;
+    }
+    navigation.navigate('Navigation', {
+      mode: selectedMode,
+      startCoords, // Ensure coords are properly serialized
+      destinationCoords,
+      travelTime: Math.round(selectedTravelTime / 60),
+      destination: initialDestination,
+      startAddress,
+    });
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+      {/* Top Bar */}
+      <SafeAreaView style={styles.topBar}>
+        <Text style={styles.topBarText}>Current Mode: {selectedMode}</Text>
+        <TouchableOpacity onPress={() => setIsLocationLocked(!isLocationLocked)}>
+          <Text style={styles.topBarText}>{isLocationLocked ? 'Unlock Map' : 'Lock Map'}</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+
+      {/* Main Content */}
+      <ScrollView contentContainerStyle={styles.contentContainer}>
         {/* Address Inputs */}
         <View style={styles.addressContainer}>
           <TextInput
@@ -235,12 +360,15 @@ const MapScreen = () => {
         {/* Map */}
         <View style={styles.mapContainer}>
           <MapView
+            ref={mapRef}
             style={styles.map}
             initialRegion={{
               ...startCoords,
               latitudeDelta: 0.0922,
               longitudeDelta: 0.0421,
             }}
+            showsUserLocation={true}
+            followsUserLocation={isLocationLocked}
           >
             <Marker coordinate={startCoords} title="Start" />
             <Marker coordinate={destinationCoords} title="Destination" />
@@ -259,16 +387,19 @@ const MapScreen = () => {
         {/* Directions List */}
         <View style={styles.directionsContainer}>
           <Text style={styles.directionsHeader}>Turn-by-Turn Directions</Text>
-          {directionsSteps.length > 0 ? (
+          <View style={{ height: 200 }}>
             <FlatList
               data={directionsSteps}
               keyExtractor={(_, index) => index.toString()}
               renderItem={renderDirectionStep}
+              nestedScrollEnabled={true}
             />
-          ) : (
-            <Text style={styles.noDirectionsText}>No directions available.</Text>
-          )}
+          </View>
         </View>
+        {/* Start Navigation Button */}
+        <TouchableOpacity style={styles.startButton} onPress={handleStartNavigation}>
+          <Text style={styles.startButtonText}>Start Navigation</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -276,7 +407,19 @@ const MapScreen = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
-  scrollContainer: { padding: 16 },
+  topBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(98, 0, 238, 0.9)',
+    padding: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    zIndex: 2,
+  },
+  topBarText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  contentContainer: { paddingTop: 60, paddingHorizontal: 16, paddingBottom: 20 },
   addressContainer: { marginBottom: 10 },
   addressInput: {
     borderWidth: 1,
@@ -296,34 +439,17 @@ const styles = StyleSheet.create({
   },
   modeButton: {
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     borderRadius: 20,
-    backgroundColor: '#ddd',
+    alignItems: 'center',
+    width: 100,
   },
-  modeButtonSelected: {
-    backgroundColor: '#6200EE',
-  },
-  modeButtonText: {
-    fontSize: 14,
-    color: '#333',
-    fontWeight: '500',
-  },
-  modeButtonTextSelected: {
-    color: '#fff',
-  },
+  modeButtonSelected: { borderWidth: 2, borderColor: '#333' },
+  modeButtonText: { fontSize: 14, color: '#fff', fontWeight: '500' },
+  modeButtonTextSelected: { color: '#fff' },
+  modeTimeText: { fontSize: 12, color: '#fff', marginTop: 4 },
   directionsContainer: { marginTop: 10 },
-  directionsHeader: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#6200EE',
-  },
-  noDirectionsText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    paddingVertical: 20,
-  },
+  directionsHeader: { fontSize: 18, fontWeight: 'bold', marginBottom: 8, color: '#6200EE' },
   stepContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -336,6 +462,18 @@ const styles = StyleSheet.create({
   stepDetails: { flex: 1 },
   stepInstruction: { fontSize: 15, marginBottom: 4, color: '#333' },
   stepMeta: { fontSize: 13, color: '#666' },
+  startButton: {
+    backgroundColor: '#6200EE',
+    padding: 16,
+    borderRadius: 8,
+    margin: 16,
+    alignItems: 'center',
+  },
+  startButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
   loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 16, color: '#6200EE', fontSize: 16 },
   errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
