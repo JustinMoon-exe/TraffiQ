@@ -1,11 +1,13 @@
+// SavedScreen.tsx
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
+import { db, auth } from '../firebaseConfig';
+import { doc, getDoc } from 'firebase/firestore';
 
-type SavedScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Saved'>;
+type SavedScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'SavedScreen'>;
 
 interface SavedRoute {
   startAddress: string;
@@ -16,23 +18,29 @@ interface SavedRoute {
 }
 
 const SavedScreen = () => {
-  const [savedRoutes, setSavedRoutes] = useState<SavedRoute[]>([]);
   const navigation = useNavigation<SavedScreenNavigationProp>();
+  const [savedRoutes, setSavedRoutes] = useState<SavedRoute[]>([]);
+  const user = auth.currentUser;
 
   useEffect(() => {
-    const loadSavedRoutes = async () => {
+    if (!user) return;
+    const fetchSavedRoutes = async () => {
       try {
-        const storedRoutes = await AsyncStorage.getItem('savedRoutes');
-        if (storedRoutes) setSavedRoutes(JSON.parse(storedRoutes));
+        const docRef = doc(db, "users", user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setSavedRoutes(data.savedRoutes || []);
+        }
       } catch (error) {
-        console.error('Error loading saved routes:', error);
+        console.error('Error fetching saved routes:', error);
       }
     };
-    loadSavedRoutes();
-  }, []);
+    fetchSavedRoutes();
+  }, [user]);
 
   const handleRoutePress = (route: SavedRoute) => {
-    navigation.navigate('Map', { destination: route.destination });
+    navigation.navigate('MapScreen', { destination: route.destination });
   };
 
   const formatDate = (timestamp: string) => {

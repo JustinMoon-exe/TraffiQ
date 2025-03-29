@@ -4,7 +4,7 @@ def get_gsu_data():
     """
     Retrieves routes, stops, and alerts for Georgia State University.
     """
-    system_id = 480
+    system_id = 480 # gsu sys id
     system = passiogo.getSystemFromID(system_id)
 
     if system:

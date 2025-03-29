@@ -1,36 +1,48 @@
+// HomeScreen.tsx
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
+import { db, auth } from '../firebaseConfig';
+import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore';
 
-type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
+type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'HomeScreen'>;
 
 const HomeScreen = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const [destination, setDestination] = useState<string>('');
   const [recentTrips, setRecentTrips] = useState<string[]>([]);
+  const user = auth.currentUser;
 
+  // Subscribe to the user's document so recentTrips updates automatically.
   useEffect(() => {
-    const loadRecentTrips = async () => {
-      try {
-        const storedTrips = await AsyncStorage.getItem('recentTrips');
-        if (storedTrips) setRecentTrips(JSON.parse(storedTrips));
-      } catch (error) {
-        console.error('Error loading recent trips:', error);
+    if (!user) return;
+    const userDocRef = doc(db, "users", user.uid);
+    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setRecentTrips(data.recentTrips || []);
       }
-    };
-    loadRecentTrips();
-  }, []);
+    }, (error) => {
+      console.error("Error listening to recent trips:", error);
+    });
+    return () => unsubscribe();
+  }, [user]);
 
   const handleSearch = async () => {
     if (!destination.trim()) return;
-
-    const newTrips = [destination, ...recentTrips.slice(0, 4)];
-    setRecentTrips(newTrips);
-    await AsyncStorage.setItem('recentTrips', JSON.stringify(newTrips));
-    navigation.navigate('Map', { destination });
+    if (user) {
+      try {
+        const userDocRef = doc(db, "users", user.uid);
+        await updateDoc(userDocRef, {
+          recentTrips: arrayUnion(destination)
+        });
+      } catch (error) {
+        console.error("Error updating recent trips:", error);
+      }
+    }
+    navigation.navigate('MapScreen', { destination });
   };
 
   return (
@@ -53,7 +65,7 @@ const HomeScreen = () => {
         renderItem={({ item }) => (
           <TouchableOpacity 
             style={styles.tripItem} 
-            onPress={() => navigation.navigate('Map', { destination: item })}
+            onPress={() => navigation.navigate('MapScreen', { destination: item })}
           >
             <Text style={styles.tripText}>{item}</Text>
           </TouchableOpacity>
@@ -68,8 +80,8 @@ const styles = StyleSheet.create({
     flex: 1, 
     padding: 20,
     backgroundColor: '#fff',
-    paddingHorizontal: 15, // Add horizontal padding
-    paddingTop: 25,        // Add top padding
+    paddingHorizontal: 15,
+    paddingTop: 25,
   },
   header: { fontSize: 24, fontWeight: 'bold', marginBottom: 10 },
   input: {

@@ -1,58 +1,49 @@
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+// RootNavigator.tsx
+import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import React from 'react';
-
-// Screens
-import HomeScreen from '../screens/HomeScreen';
+import LogicScreen from '../screens/LogicScreen';
+import LoginScreen from '../screens/LoginScreen';
+import RegisterScreen from '../screens/RegisterScreen';
+import TabNavigator from './TabNavigator';
 import MapScreen from '../screens/MapScreen';
-import NavigationScreen from '../screens/NavigationScreen';
+import HomeScreen from '../screens/HomeScreen';
 import SavedScreen from '../screens/SavedScreen';
-import SettingsScreen from '../screens/SettingsScreen';
-import { RootStackParamList, BottomTabParamList, IoniconName } from '../types';
+import NavigationScreen from '../screens/NavigationScreen';  // Import your NavigationScreen
 
-const Tab = createBottomTabNavigator<BottomTabParamList>();
-const Stack = createNativeStackNavigator<RootStackParamList>();
-
-// Explicit icon mapping with type safety
-const tabIcons: Record<keyof BottomTabParamList, IoniconName> = {
-  Explore: 'location-outline',
-  Saved: 'bookmark-outline',
-  Settings: 'settings-outline',
+export type RootStackParamList = {
+  Logic: undefined;
+  Login: undefined;
+  Register: undefined;
+  HomeScreen: undefined;
+  MapScreen: { destination?: string };
+  NavigationScreen: {
+    mode: string;
+    startCoords: { latitude: number; longitude: number };
+    destinationCoords: { latitude: number; longitude: number };
+    travelTime: number;
+    destination: string;
+    startAddress: string;
+  };
+  SavedScreen: undefined;
+  Main: undefined;
 };
 
-const ExploreStack = () => (
-  <Stack.Navigator screenOptions={{ headerShown: false }}>
-    <Stack.Screen name="Home" component={HomeScreen} />
-    <Stack.Screen name="Map" component={MapScreen} />
-    <Stack.Screen name="Navigation" component={NavigationScreen} />
-  </Stack.Navigator>
+const RootStack = createNativeStackNavigator<RootStackParamList>();
+
+const RootNavigator = () => (
+  <NavigationContainer>
+    <RootStack.Navigator initialRouteName="Logic" screenOptions={{ headerShown: false }}>
+      <RootStack.Screen name="Logic" component={LogicScreen} />
+      <RootStack.Screen name="HomeScreen" component={HomeScreen} />
+      <RootStack.Screen name="Login" component={LoginScreen} />
+      <RootStack.Screen name="Register" component={RegisterScreen} />
+      <RootStack.Screen name="Main" component={TabNavigator} />
+      <RootStack.Screen name="MapScreen" component={MapScreen} />
+      <RootStack.Screen name="NavigationScreen" component={NavigationScreen} />
+      <RootStack.Screen name="SavedScreen" component={SavedScreen} />
+    </RootStack.Navigator>
+  </NavigationContainer>
 );
-
-const RootNavigator = () => {
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-      <NavigationContainer>
-        <Tab.Navigator
-          screenOptions={({ route }) => ({
-            tabBarIcon: ({ color, size }) => {
-              const iconName = tabIcons[route.name];
-              return <Ionicons name={iconName} size={size} color={color} />;
-            },
-            tabBarActiveTintColor: '#6200EE',
-            tabBarInactiveTintColor: 'gray',
-            headerShown: false,
-          })}
-        >
-          <Tab.Screen name="Explore" component={ExploreStack} />
-          <Tab.Screen name="Saved" component={SavedScreen} />
-          <Tab.Screen name="Settings" component={SettingsScreen} />
-        </Tab.Navigator>
-      </NavigationContainer>
-    </SafeAreaView>
-  );
-};
 
 export default RootNavigator;
