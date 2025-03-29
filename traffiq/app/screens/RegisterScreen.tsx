@@ -39,7 +39,7 @@ const RegisterScreen = () => {
       });
       Alert.alert('Success', 'Registration successful!');
       // Navigate to the main screen (e.g., MapScreen)
-      navigation.navigate('MapScreen');
+      navigation.navigate('HomeScreen');
     } catch (error: any) {
       console.error('Registration error:', error);
       Alert.alert('Registration Error', error.message);

@@ -24,7 +24,7 @@ const LoginScreen = () => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       // On successful login, navigate to your app's main screen
-      navigation.navigate('MapScreen');
+      navigation.navigate('Main');
     } catch (error: any) {
       console.error('Login error:', error);
       Alert.alert('Login Error', error.message);

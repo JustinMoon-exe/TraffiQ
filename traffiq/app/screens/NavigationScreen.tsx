@@ -15,7 +15,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, Coordinates } from '../types/types';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-type NavigationScreenRouteProp = NativeStackNavigationProp<RootStackParamList, 'Navigation'>;
+type NavigationScreenRouteProp = NativeStackNavigationProp<RootStackParamList, 'NavigationScreen'>;
 
 type MapDirectionMode = 'DRIVING' | 'WALKING' | 'BICYCLING' | 'TRANSIT';
 

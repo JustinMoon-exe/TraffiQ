@@ -16,6 +16,9 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RootStackParamList, Coordinates } from '../types/types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { doc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { db, auth } from '../firebaseConfig';
 
 type MapScreenRouteProp = RouteProp<RootStackParamList, 'MapScreen'>;
 type MapScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MapScreen'>;
@@ -123,8 +126,31 @@ const MapScreen = () => {
     fetchDestination();
   }, [initialDestination]);
 
-  // Define a function to fetch directions so it can be called on interval
-  const fetchDirections = useCallback(async () => {
+  // Fetch directions steps for the selected mode
+  useEffect(() => {
+    const fetchDirections = async () => {
+      if (!startCoords || !destinationCoords) return;
+      try {
+        const response = await fetch(
+          `https://maps.googleapis.com/maps/api/directions/json?origin=${startCoords.latitude},${startCoords.longitude}&destination=${destinationCoords.latitude},${destinationCoords.longitude}&mode=${selectedMode.toLowerCase()}&key=${API_KEY}`
+        );
+        if (!response.ok) return;
+        const data = await response.json();
+        if (data.routes?.[0]?.legs?.[0]?.steps) {
+          setDirectionsSteps(data.routes[0].legs[0].steps);
+        } else {
+          setDirectionsSteps([]);
+        }
+      } catch (err) {
+        console.error("Directions error:", err);
+      }
+    };
+
+    fetchDirections();
+  }, [selectedMode, startCoords, destinationCoords]);
+
+  // Poll for directions every 5 seconds
+  const fetchDirectionsCallback = useCallback(async () => {
     if (!startCoords || !destinationCoords) return;
     try {
       const response = await fetch(
@@ -138,17 +164,16 @@ const MapScreen = () => {
         setDirectionsSteps([]);
       }
     } catch (err) {
-      console.error("Directions error:", err);
+      console.error("Polling directions error:", err);
     }
   }, [startCoords, destinationCoords, selectedMode]);
 
-  // Poll for directions every 5 seconds
   useEffect(() => {
     const intervalId = setInterval(() => {
-      fetchDirections();
+      fetchDirectionsCallback();
     }, 5000);
     return () => clearInterval(intervalId);
-  }, [fetchDirections]);
+  }, [fetchDirectionsCallback]);
 
   // Fetch travel times for each mode
   useEffect(() => {
@@ -235,7 +260,7 @@ const MapScreen = () => {
       Alert.alert('Error', 'Travel time not available for selected mode.');
       return;
     }
-    navigation.navigate('Navigation', {
+    navigation.navigate('NavigationScreen', {
       mode: selectedMode,
       startCoords,
       destinationCoords,
@@ -247,6 +272,10 @@ const MapScreen = () => {
 
   // Save Route button handler
   const handleSaveRoute = async () => {
+    if (!auth.currentUser) {
+      Alert.alert("Error", "User not logged in");
+      return;
+    }
     const newRoute = {
       startAddress,
       destination: initialDestination,
@@ -255,15 +284,15 @@ const MapScreen = () => {
       timestamp: new Date().toISOString(),
     };
     try {
-      const storedRoutes = await AsyncStorage.getItem('savedRoutes');
-      const savedRoutes = storedRoutes ? JSON.parse(storedRoutes) : [];
-      savedRoutes.push(newRoute);
-      await AsyncStorage.setItem('savedRoutes', JSON.stringify(savedRoutes));
+      const userDocRef = doc(db, "users", auth.currentUser.uid);
+      await setDoc(userDocRef, { savedRoutes: arrayUnion(newRoute) }, { merge: true });
       Alert.alert('Success', 'Route saved successfully!');
     } catch (error) {
+      console.error("Save route error:", error);
       Alert.alert('Error', 'Failed to save route');
     }
   };
+  
 
   return (
     <SafeAreaView style={styles.container}>
@@ -318,7 +347,7 @@ const MapScreen = () => {
               strokeColor="#6200EE"
             />
           </MapView>
-          {/* Floating Camera Center Button */}
+          {/* Floating Center Button */}
           <TouchableOpacity style={styles.floatingCenterButton} onPress={centerMap}>
             <Text style={styles.floatingCenterButtonText}>⦿</Text>
           </TouchableOpacity>
@@ -403,6 +432,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 4,
+    zIndex: 10,
   },
   floatingCenterButtonText: { fontSize: 24, color: '#6200EE' },
   modeButtonsContainer: { flexDirection: 'row', justifyContent: 'space-around', marginVertical: 10 },
