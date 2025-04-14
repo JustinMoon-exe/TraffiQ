@@ -16,6 +16,7 @@ export type RootStackParamList = {
 export type BottomTabParamList = {
   Explore: undefined;
   Saved: undefined;
+  Bus: undefined; // <-- Add this line
   Settings: undefined;
 };
 
