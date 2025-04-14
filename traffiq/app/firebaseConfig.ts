@@ -1,16 +1,14 @@
 // firebaseConfig.ts
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
-// --- Import necessary auth functions and AsyncStorage ---
 import {
   initializeAuth,
-  getReactNativePersistence // Verified import path for v9+
+  getReactNativePersistence 
 } from 'firebase/auth';
 import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDwDsdgGQaRWBhDgEkyeNhwOPOOJHxpB04", // Consider using environment variables
-  authDomain: "traffiq-a742b.firebaseapp.com",
+  apiKey: "AIzaSyDwDsdgGQaRWBhDgEkyeNhwOPOOJHxpB04", 
   projectId: "traffiq-a742b",
   storageBucket: "traffiq-a742b.appspot.com",
   messagingSenderId: "128940776716",

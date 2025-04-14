@@ -21,9 +21,9 @@ type MapDirectionMode = 'DRIVING' | 'WALKING' | 'BICYCLING' | 'TRANSIT';
 
 interface RouteParams {
   mode: string;
-  startCoords: Coordinates; // initial value passed in
+  startCoords: Coordinates; 
   destinationCoords: Coordinates;
-  travelTime: number; // initial travel time (in minutes)
+  travelTime: number; 
   destination: string;
   startAddress: string;
 }
@@ -42,18 +42,14 @@ const NavigationScreen = () => {
     startAddress: initialStartAddress,
   } = route.params as RouteParams;
 
-  // Live state for user's position (startCoords) and address.
   const [startCoords, setStartCoords] = useState<Coordinates>(initialStartCoords);
   const [startAddress, setStartAddress] = useState(initialStartAddress);
-  // Live directions steps
   const [directionsSteps, setDirectionsSteps] = useState<any[]>([]);
-  // Live travel time (updated from directions)
   const [currentTravelTime, setCurrentTravelTime] = useState(initialTravelTime);
 
   const mapRef = useRef<MapView>(null);
   const screenWidth = Dimensions.get('window').width;
 
-  // Subscribe to live location updates so the user’s position is updated
   useEffect(() => {
     let subscription: Location.LocationSubscription;
     const subscribeToLocation = async () => {
@@ -66,8 +62,8 @@ const NavigationScreen = () => {
         subscription = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.High,
-            timeInterval: 3000, // update every 3 seconds
-            distanceInterval: 5, // update every 5 meters
+            timeInterval: 3000, 
+            distanceInterval: 5, 
           },
           (location) => {
             const newCoords = {
@@ -88,7 +84,6 @@ const NavigationScreen = () => {
     };
   }, []);
 
-  // Re-fetch directions whenever the user position changes
   const fetchDirections = useCallback(async () => {
     try {
       const response = await fetch(
@@ -98,7 +93,6 @@ const NavigationScreen = () => {
       const data = await response.json();
       if (data.routes?.[0]?.legs?.[0]?.steps) {
         setDirectionsSteps(data.routes[0].legs[0].steps);
-        // Update travel time in minutes from the live data
         const updatedTimeSec = data.routes[0].legs[0].duration.value;
         setCurrentTravelTime(Math.round(updatedTimeSec / 60));
       } else {
@@ -109,7 +103,6 @@ const NavigationScreen = () => {
     }
   }, [startCoords, destinationCoords, mode]);
 
-  // Poll for updated directions every 5 seconds
   useEffect(() => {
     const intervalId = setInterval(() => {
       fetchDirections();
@@ -117,14 +110,12 @@ const NavigationScreen = () => {
     return () => clearInterval(intervalId);
   }, [fetchDirections]);
 
-  // Calculate ETA based on currentTravelTime
   const calculateETA = () => {
     const now = new Date();
     now.setMinutes(now.getMinutes() + currentTravelTime);
     return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  // Center map on user's current location with a tight zoom level
   const centerMap = () => {
     if (mapRef.current) {
       const region: Region = {
@@ -137,7 +128,6 @@ const NavigationScreen = () => {
     }
   };
 
-  // Live directions card instructions
   const currentInstruction = directionsSteps[0]?.html_instructions
     ? directionsSteps[0].html_instructions.replace(/<[^>]+>/g, '')
     : 'No directions available';
@@ -145,7 +135,6 @@ const NavigationScreen = () => {
     ? directionsSteps[1].html_instructions.replace(/<[^>]+>/g, '')
     : '';
 
-  // Use a tight region so that the map is closely zoomed
   const region: Region = {
     latitude: startCoords.latitude,
     longitude: startCoords.longitude,
@@ -160,7 +149,6 @@ const NavigationScreen = () => {
         style={styles.map}
         region={region}
         showsUserLocation={true}
-        // Do not render a marker for startCoords; only destination marker is shown.
       >
         <MapViewDirections
           origin={startCoords}
@@ -170,15 +158,12 @@ const NavigationScreen = () => {
           strokeWidth={4}
           strokeColor="#6200EE"
         />
-        {/* <MapView.Marker coordinate={destinationCoords} title="Destination" description={destination} /> */}
       </MapView>
 
-      {/* Floating Center Button */}
       <TouchableOpacity style={styles.floatingCenterButton} onPress={centerMap}>
         <Text style={styles.floatingCenterButtonText}>⦿</Text>
       </TouchableOpacity>
 
-      {/* Top Info Bar */}
       <SafeAreaView style={styles.topBar}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Text style={styles.backButtonText}>Back</Text>
@@ -189,7 +174,6 @@ const NavigationScreen = () => {
         </View>
       </SafeAreaView>
 
-      {/* Bottom Directions Card */}
       <View style={styles.bottomCard}>
         <Text style={styles.currentStep}>{currentInstruction}</Text>
         {nextInstruction ? <Text style={styles.nextStep}>Next: {nextInstruction}</Text> : null}

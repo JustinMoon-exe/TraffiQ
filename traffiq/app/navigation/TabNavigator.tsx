@@ -2,12 +2,12 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-// import { SafeAreaView } from 'react-native-safe-area-context'; // Removed as potentially redundant
+import { Platform } from 'react-native'; 
 import HomeScreen from '../screens/HomeScreen';
 import SavedScreen from '../screens/SavedScreen';
 import SettingsScreen from '../screens/SettingsScreen';
-import BusScreen from '../screens/BusScreen'; // Ensure path is correct
-import { BottomTabParamList, IoniconName } from '../types'; // Ensure types are updated
+import BusScreen from '../screens/BusScreen';
+import { BottomTabParamList, IoniconName } from '../types';
 
 const Tab = createBottomTabNavigator<BottomTabParamList>();
 
@@ -20,31 +20,37 @@ const tabIcons: Record<keyof BottomTabParamList, IoniconName> = {
 
 const TabNavigator = () => {
   return (
-    // Removed SafeAreaView wrapper - test if this looks okay visually
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
           const iconName = tabIcons[route.name] || 'help-circle-outline';
-          return <Ionicons name={iconName} size={size} color={color} />;
+          return <Ionicons name={iconName} size={size + 2} color={color} />;
         },
-        tabBarActiveTintColor: '#6200EE',
+        tabBarActiveTintColor: '#483bcb', 
         tabBarInactiveTintColor: 'gray',
         headerShown: false,
         tabBarStyle: {
-          // Add any custom styles if needed
+          height: Platform.OS === 'ios' ? 90 : 65, 
+          paddingBottom: Platform.OS === 'ios' ? 30 : 5, 
+          paddingTop: 5, 
+          backgroundColor: '#FFFFFF', 
+          borderTopWidth: 1, 
+          borderTopColor: '#E0E0E0', 
         },
         tabBarLabelStyle: {
-          // Add any custom styles if needed
+          marginBottom: Platform.OS === 'ios' ? 10: 10, 
+          fontSize: 11, 
+        },
+        tabBarIconStyle: {
+           marginTop: Platform.OS === 'ios' ? 0 : 2, 
         }
       })}
     >
-      {/* ONLY Tab.Screen components should be direct children */}
       <Tab.Screen name="Explore" component={HomeScreen} />
       <Tab.Screen name="Saved" component={SavedScreen} />
       <Tab.Screen name="Bus" component={BusScreen} />
       <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>
-    // Removed SafeAreaView closing tag
   );
 };
 

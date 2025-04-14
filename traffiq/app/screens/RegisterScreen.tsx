@@ -16,7 +16,6 @@ const RegisterScreen = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Only allow .gsu.edu emails
   const isValidEmail = (email: string) => email.trim().toLowerCase().endsWith('.gsu.edu');
 
   const handleRegister = async () => {
@@ -31,14 +30,11 @@ const RegisterScreen = () => {
     setLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      // Create a user document in Firestore for configuration and saved routes
       await setDoc(doc(db, "users", userCredential.user.uid), {
         email: userCredential.user.email,
         createdAt: new Date().toISOString(),
-        // Add additional user configuration fields here
       });
       Alert.alert('Success', 'Registration successful!');
-      // Navigate to the main screen (e.g., MapScreen)
       navigation.navigate('HomeScreen');
     } catch (error: any) {
       console.error('Registration error:', error);

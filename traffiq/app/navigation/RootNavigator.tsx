@@ -9,7 +9,7 @@ import TabNavigator from './TabNavigator';
 import MapScreen from '../screens/MapScreen';
 import HomeScreen from '../screens/HomeScreen';
 import SavedScreen from '../screens/SavedScreen';
-import NavigationScreen from '../screens/NavigationScreen';  // Import your NavigationScreen
+import NavigationScreen from '../screens/NavigationScreen';  
 import BusScreen from '../screens/BusScreen';
 
 export type RootStackParamList = {

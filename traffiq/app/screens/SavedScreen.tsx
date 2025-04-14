@@ -6,95 +6,79 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView, // Import SafeAreaView
-  StatusBar,    // Import StatusBar
-  Platform,     // Import Platform
-  ActivityIndicator // Import ActivityIndicator for loading state
+  SafeAreaView,
+  StatusBar,
+  Platform,
+  ActivityIndicator
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../types'; // Assuming RootStackParamList is defined correctly
+import { RootStackParamList } from '../types';
 import { db, auth } from '../firebaseConfig';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore'; // Import onSnapshot if real-time updates are desired
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 
-// Use the specific navigation prop type
 type SavedScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'SavedScreen'>;
 
-// Interface for the data structure in Firestore
 interface SavedRoute {
   startAddress: string;
   destination: string;
   mode: string;
   travelTime: number;
-  timestamp: string; // Assuming timestamp is stored as ISO string
-  // Add coordinates if they are stored and needed for navigation later
-  // startCoords?: Coordinates;
-  // destinationCoords?: Coordinates;
+  timestamp: string;
 }
 
 const SavedScreen = () => {
   const navigation = useNavigation<SavedScreenNavigationProp>();
   const [savedRoutes, setSavedRoutes] = useState<SavedRoute[]>([]);
-  const [loading, setLoading] = useState(true); // Add loading state
-  const [error, setError] = useState<string | null>(null); // Add error state
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const user = auth.currentUser;
 
-  // --- Fetch Saved Routes Logic (Using onSnapshot for real-time updates) ---
   useEffect(() => {
     if (!user) {
       setError("Please log in to view saved routes.");
       setLoading(false);
-      setSavedRoutes([]); // Clear routes if user logs out
+      setSavedRoutes([]);
       return;
     }
 
-    setLoading(true); // Start loading when user is available
-    setError(null); // Clear previous errors
+    setLoading(true);
+    setError(null);
     const userDocRef = doc(db, "users", user.uid);
 
-    // Use onSnapshot to listen for real-time changes
     const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        // Ensure savedRoutes is always an array and sort by timestamp descending
         const routes = Array.isArray(data.savedRoutes) ? data.savedRoutes : [];
-        routes.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()); // Sort newest first
+        routes.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
         setSavedRoutes(routes);
-        setError(null); // Clear error on successful fetch
+        setError(null);
       } else {
         console.log("User document doesn't exist for saved routes.");
-        setSavedRoutes([]); // User exists but no doc? Clear routes.
+        setSavedRoutes([]);
       }
-      setLoading(false); // Stop loading after fetch/update
-    }, (err) => { // Handle errors during listening
+      setLoading(false);
+    }, (err) => {
       console.error('Error listening to saved routes:', err);
       setError("Could not load saved routes. Please try again later.");
-      setLoading(false); // Stop loading on error
+      setLoading(false);
     });
 
-    // Cleanup function to unsubscribe when component unmounts or user changes
     return () => unsubscribe();
 
-  }, [user]); // Re-run effect if user changes
+  }, [user]);
 
-  // --- Navigation Handler ---
   const handleRoutePress = (route: SavedRoute) => {
     console.log("Navigating to map with saved route:", route.destination);
-    // Navigate to MapScreen, passing only the destination name for now
-    // If you stored coordinates, you could potentially pass them too
-    // to skip the geocoding step on the MapScreen
     navigation.navigate('MapScreen', { destination: route.destination });
   };
 
-  // --- Date Formatting Helper ---
   const formatDate = (timestamp: string) => {
     try {
         const date = new Date(timestamp);
-        // Check if date is valid before formatting
         if (isNaN(date.getTime())) {
             return "Invalid date";
         }
-        // More readable format
         return date.toLocaleDateString(undefined, {
             year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
         });
@@ -104,12 +88,11 @@ const SavedScreen = () => {
     }
   };
 
-  // --- Render Item Function for FlatList ---
   const renderRouteItem = ({ item }: { item: SavedRoute }) => (
     <TouchableOpacity
       style={styles.routeItem}
       onPress={() => handleRoutePress(item)}
-      activeOpacity={0.7} // Provide visual feedback on press
+      activeOpacity={0.7}
     >
       <Text style={styles.routeTitle} numberOfLines={1}>{item.destination}</Text>
       <Text style={styles.routeDetail} numberOfLines={1}>From: {item.startAddress}</Text>
@@ -123,38 +106,30 @@ const SavedScreen = () => {
 
 
   return (
-    // --- Apply themed structure ---
     <View style={styles.backgroundView}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
       <SafeAreaView style={styles.safeAreaContent}>
         <View style={styles.container}>
-          {/* --- Themed Header --- */}
           <Text style={styles.header}>Saved Routes</Text>
 
-          {/* --- Card for the List --- */}
           <View style={styles.card}>
-            {/* --- Loading State --- */}
             {loading && (
               <View style={styles.centered}>
                 <ActivityIndicator size="large" color="#483bcb" />
               </View>
             )}
 
-            {/* --- Error State --- */}
             {!loading && error && (
                 <View style={styles.centered}>
                     <Text style={styles.errorText}>{error}</Text>
-                     {/* Optional: Add a retry button */}
-                     {/* <TouchableOpacity onPress={fetchSavedRoutes}> ... </TouchableOpacity> */}
                 </View>
             )}
 
-            {/* --- List Display (only when not loading and no error) --- */}
             {!loading && !error && (
               <FlatList
                 data={savedRoutes}
                 renderItem={renderRouteItem}
-                keyExtractor={(item, index) => item.timestamp || index.toString()} // Use timestamp if available
+                keyExtractor={(item, index) => item.timestamp || index.toString()}
                 showsVerticalScrollIndicator={false}
                 ItemSeparatorComponent={() => <View style={styles.separator} />}
                 contentContainerStyle={styles.listContentContainer}
@@ -173,31 +148,29 @@ const SavedScreen = () => {
   );
 };
 
-// --- Styles incorporating the theme ---
 const styles = StyleSheet.create({
-  backgroundView: { // Outermost container with theme background
+  backgroundView: {
     flex: 1,
-    backgroundColor: '#483bcb', // Match other screens
+    backgroundColor: '#483bcb',
   },
-  safeAreaContent: { // Handles padding for notches/bars
+  safeAreaContent: {
     flex: 1,
   },
-  container: { // Inner container for content layout
+  container: {
     flex: 1,
-    paddingHorizontal: 25, // Consistent horizontal padding
-    paddingBottom: 15, // Space at bottom
-    // paddingTop removed, safe area handles top
+    paddingHorizontal: 25,
+    paddingBottom: 15,
   },
-  header: { // Themed header text
-    fontSize: 28, // Larger header
+  header: {
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#FFFFFF', // White text
-    marginTop: Platform.OS === 'ios' ? 40 : 90, // Adjust top margin after safe area
-    marginBottom: 20, // Space below header
-    textAlign: 'center', // Center header text
+    color: '#FFFFFF',
+    marginTop: Platform.OS === 'ios' ? 40 : 90,
+    marginBottom: 20,
+    textAlign: 'center',
   },
-  card: { // White card containing the list
-    flex: 1, // Take remaining space
+  card: {
+    flex: 1,
     backgroundColor: '#ffffff',
     borderRadius: 20,
     shadowColor: '#000',
@@ -205,63 +178,62 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 5,
     elevation: 5,
-    overflow: 'hidden', // Clip list content
+    overflow: 'hidden',
   },
-  listContentContainer: { // Padding inside the FlatList within the card
+  listContentContainer: {
     padding: 20,
-    flexGrow: 1, // Help content (like empty state) fill the card
+    flexGrow: 1,
   },
-  routeItem: { // Styling for each saved route item
+  routeItem: {
     paddingVertical: 15,
-    paddingHorizontal: 0, // Padding handled by list container
-    // Remove background color and elevation, use separator instead
+    paddingHorizontal: 0,
   },
-  routeTitle: { // Destination text
+  routeTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
     marginBottom: 6,
   },
-  routeDetail: { // Other details (From, Mode, Duration)
+  routeDetail: {
     fontSize: 14,
-    color: '#555', // Slightly darker grey
-    lineHeight: 20, // Improve readability
+    color: '#555',
+    lineHeight: 20,
   },
-  detailRow: { // Arrange Mode and Duration side-by-side
+  detailRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       marginVertical: 3,
   },
-  routeDate: { // Timestamp text
+  routeDate: {
     fontSize: 12,
-    color: '#999', // Light grey
+    color: '#999',
     marginTop: 8,
   },
-  separator: { // Line between items
+  separator: {
     height: 1,
-    backgroundColor: '#eef0f2', // Lighter separator
+    backgroundColor: '#eef0f2',
   },
-  centered: { // Utility for centering loading/empty/error states
+  centered: {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
       padding: 20,
   },
-  emptyText: { // Text for empty list
+  emptyText: {
     textAlign: 'center',
     color: '#666',
     fontSize: 16,
     fontWeight: '500',
     marginBottom: 5,
   },
-  emptySubText: { // Additional text for empty list
+  emptySubText: {
      textAlign: 'center',
      color: '#888',
      fontSize: 14,
   },
-  errorText: { // Text for error message
+  errorText: {
       textAlign: 'center',
-      color: '#D32F2F', // Reddish error color
+      color: '#D32F2F',
       fontSize: 16,
   }
 });

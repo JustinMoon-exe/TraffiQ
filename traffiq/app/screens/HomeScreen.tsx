@@ -7,9 +7,9 @@ import {
   TouchableOpacity,
   FlatList,
   StyleSheet,
-  SafeAreaView, // Still needed for content padding
+  SafeAreaView,
   Image,
-  StatusBar,    // Need StatusBar for configuration
+  StatusBar,
   Platform
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -27,7 +27,6 @@ const HomeScreen = () => {
   const [recentTrips, setRecentTrips] = useState<string[]>([]);
   const user = auth.currentUser;
 
-  // --- Firebase logic (Keep as is) ---
   useEffect(() => {
     if (!user) return;
     const userDocRef = doc(db, "users", user.uid);
@@ -63,9 +62,7 @@ const HomeScreen = () => {
     }
     navigation.navigate('MapScreen', { destination: trimmedDestination });
   };
-  // --- End of Firebase logic ---
 
-  // --- Render Function for Trip Items (Keep as is) ---
   const renderTripItem = ({ item }: { item: string }) => (
     <TouchableOpacity
       style={styles.tripItemTouchable}
@@ -80,17 +77,13 @@ const HomeScreen = () => {
   );
 
   return (
-    // --- 1. Outermost View for Edge-to-Edge Background ---
     <View style={styles.backgroundView}>
-      {/* --- 2. Configure StatusBar --- */}
       <StatusBar
-        barStyle="light-content" // Make icons light
-        backgroundColor="transparent" // Make background transparent
-        translucent={true} // Allow content to draw behind status bar (Android)
+        barStyle="light-content"
+        backgroundColor="transparent"
+        translucent={true}
       />
-      {/* --- 3. Inner SafeAreaView for Content Padding --- */}
       <SafeAreaView style={styles.safeAreaContent}>
-        {/* --- Content starts here, respecting safe areas --- */}
         <View style={styles.container}>
           <Image
             source={require('../../assets/traffiq.png')}
@@ -126,41 +119,31 @@ const HomeScreen = () => {
             />
           </View>
         </View>
-        {/* --- Content ends here --- */}
       </SafeAreaView>
     </View>
   );
 };
 
-
-// --- Styles ---
 const styles = StyleSheet.create({
-  // Style for the outermost view providing the background
   backgroundView: {
     flex: 1,
-    backgroundColor: '#483bcb', // Your desired edge-to-edge background color
+    backgroundColor: '#483bcb',
   },
-  // Style for the SafeAreaView that PADS the content
   safeAreaContent: {
-    flex: 1, // Take up all space within the background view
-    // No background color here - it's transparent by default
+    flex: 1,
   },
-  // Style for the main content container INSIDE the SafeAreaView
   container: {
-    flex: 1, // Fill the safe area
+    flex: 1,
     paddingHorizontal: 25,
-    // Adjust top/bottom padding as needed *within* the safe area
-    // SafeAreaView handles the major notch/bar padding automatically
-    paddingTop: 120, // Smaller padding now, SafeAreaView handles the notch
-    paddingBottom: 15, // Reduced padding, SafeAreaView handles bottom bar area
+    paddingTop: 120,
+    paddingBottom: 15,
   },
   logo: {
     width: '70%',
     height: 80,
     alignSelf: 'center',
-    // Adjust margin based on new paddingTop in container
     marginBottom: 25,
-    marginTop: 10, // Add some margin below the status bar area if needed
+    marginTop: 10,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -168,8 +151,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#e0dae7',
     borderRadius: 50,
     paddingHorizontal: 15,
-    paddingVertical: Platform.OS === 'ios' ? 40 : 10,
-    marginBottom: 25, // Adjusted margin
+    paddingVertical: Platform.OS === 'ios' ? 12 : 10,
+    marginBottom: 25,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -186,7 +169,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   card: {
-    flex: 1, // Important: Card still takes remaining space *within safe area*
+    flex: 1,
     backgroundColor: '#ffffff',
     borderRadius: 20,
     shadowColor: '#000',
@@ -206,7 +189,7 @@ const styles = StyleSheet.create({
   },
   listContentContainer: {
       paddingHorizontal: 20,
-      paddingBottom: 20, // Padding inside the list scroll
+      paddingBottom: 20,
       flexGrow: 1,
   },
   tripItemTouchable: {

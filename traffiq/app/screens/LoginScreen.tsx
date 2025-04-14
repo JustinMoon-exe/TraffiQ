@@ -8,20 +8,19 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
-  SafeAreaView, // Import
-  StatusBar,    // Import
-  Image,        // Import
-  Platform,     // Import
-  KeyboardAvoidingView // Import for keyboard handling
+  SafeAreaView,
+  StatusBar,
+  Image,
+  Platform,
+  KeyboardAvoidingView
 } from 'react-native';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebaseConfig';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../types'; // Adjust path if needed
-import { Ionicons } from '@expo/vector-icons'; // Import Ionicons
+import { RootStackParamList } from '../types';
+import { Ionicons } from '@expo/vector-icons';
 
-// Use the specific navigation prop type from your types file or defined inline
 type LoginScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
 
 const LoginScreen = () => {
@@ -30,27 +29,20 @@ const LoginScreen = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // --- Corrected login logic ---
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) { // Trim input before checking
+    if (!email.trim() || !password.trim()) {
       Alert.alert('Error', 'Please enter both email and password.');
       return;
     }
     setLoading(true);
     try {
-      console.log("Attempting login..."); // Log start
-      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password); // Use trimmed values
-      console.log("Login successful for user:", userCredential.user.uid); // Log success
-
-      // --- *** ENSURE THIS LINE IS PRESENT AND CORRECT *** ---
-      // Navigate to the main part of the app after successful login.
-      // 'Main' should be the name of the screen in your RootNavigator that holds the TabNavigator.
+      console.log("Attempting login...");
+      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+      console.log("Login successful for user:", userCredential.user.uid);
       navigation.replace('Main');
-      // --- *** ---
 
     } catch (error: any) {
-      console.error('Login error:', error.code, error.message); // Log error code and message
-      // Provide more user-friendly error messages
+      console.error('Login error:', error.code, error.message);
       let errorMessage = 'An unexpected error occurred. Please try again.';
       if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
           errorMessage = 'Invalid email or password. Please try again.';
@@ -66,29 +58,23 @@ const LoginScreen = () => {
       setLoading(false);
     }
   };
-  // --- End of login logic ---
 
   return (
-    // --- Apply themed structure ---
     <View style={styles.backgroundView}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
       <SafeAreaView style={styles.safeAreaContent}>
-        {/* Use KeyboardAvoidingView to prevent inputs being hidden */}
         <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={styles.keyboardAvoiding}
-            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20} // Adjust offset if needed
+            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
         >
-           {/* Inner container for centering and padding */}
             <View style={styles.container}>
-                {/* --- Logo --- */}
                 <Image
-                    source={require('../../assets/traffiq.png')} // Verify path
+                    source={require('../../assets/traffiq.png')}
                     style={styles.logo}
                     resizeMode="contain"
                 />
 
-                {/* --- Themed Inputs --- */}
                 <View style={styles.inputContainer}>
                      <Ionicons name="mail-outline" size={20} color="rgba(255, 255, 255, 0.7)" style={styles.inputIcon} />
                      <TextInput
@@ -98,9 +84,9 @@ const LoginScreen = () => {
                         onChangeText={setEmail}
                         keyboardType="email-address"
                         autoCapitalize="none"
-                        placeholderTextColor="rgba(255, 255, 255, 0.7)" // Light placeholder
-                        returnKeyType="next" // Indicate next field
-                        onSubmitEditing={() => { /* Optionally focus next input ref */ }}
+                        placeholderTextColor="rgba(255, 255, 255, 0.7)"
+                        returnKeyType="next"
+                        onSubmitEditing={() => {}}
                      />
                 </View>
 
@@ -113,12 +99,11 @@ const LoginScreen = () => {
                         value={password}
                         onChangeText={setPassword}
                         placeholderTextColor="rgba(255, 255, 255, 0.7)"
-                        returnKeyType="go" // Indicate final action
-                        onSubmitEditing={handleLogin} // Trigger login on submit
+                        returnKeyType="go"
+                        onSubmitEditing={handleLogin}
                     />
                 </View>
 
-                {/* --- Loading or Login Button --- */}
                 {loading ? (
                     <ActivityIndicator size="large" color="#FFFFFF" style={styles.loadingIndicator}/>
                 ) : (
@@ -127,7 +112,6 @@ const LoginScreen = () => {
                     </TouchableOpacity>
                 )}
 
-                {/* --- Switch to Register Screen --- */}
                 <TouchableOpacity onPress={() => navigation.navigate('Register')} style={styles.switchButton}>
                     <Text style={styles.switchText}>Don't have an account? </Text>
                     <Text style={[styles.switchText, styles.switchLink]}>Register</Text>
@@ -139,7 +123,6 @@ const LoginScreen = () => {
   );
 };
 
-// --- Styles incorporating the theme (Keep as before) ---
 const styles = StyleSheet.create({
   backgroundView: { flex: 1, backgroundColor: '#483bcb', },
   safeAreaContent: { flex: 1, },
