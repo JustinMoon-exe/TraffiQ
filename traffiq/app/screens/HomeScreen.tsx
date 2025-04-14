@@ -1,4 +1,3 @@
-// HomeScreen.tsx
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -47,10 +46,10 @@ const HomeScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Where do you want to go?</Text>
+      <Text style={styles.header}>Traffiq</Text>
       <TextInput
         style={styles.input}
-        placeholder="Enter destination..."
+        placeholder="Search for your destination..."
         value={destination}
         onChangeText={setDestination}
       />
@@ -79,24 +78,60 @@ const styles = StyleSheet.create({
   container: { 
     flex: 1, 
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: '#6C47FF', // Main background color adjusted to match image design
     paddingHorizontal: 15,
     paddingTop: 25,
   },
-  header: { fontSize: 24, fontWeight: 'bold', marginBottom: 10 },
+  header: { 
+    fontSize: 32, 
+    fontWeight: 'bold', 
+    color: '#fff', 
+    textAlign: 'center', 
+    marginBottom: 20 
+  },
   input: {
     borderWidth: 1,
-    borderColor: '#ccc',
-    padding: 12,
-    borderRadius: 8,
+    borderColor: '#fff',
+    padding: 15,
+    borderRadius: 25,
     marginBottom: 10,
     backgroundColor: '#fff',
+    fontSize: 16,
+    color: '#333',
   },
-  searchButton: { backgroundColor: '#6200EE', padding: 12, borderRadius: 8, alignItems: 'center' },
-  searchText: { color: '#fff', fontWeight: 'bold' },
-  recentHeader: { fontSize: 18, fontWeight: 'bold', marginTop: 20 },
-  tripItem: { padding: 10, backgroundColor: '#f2f2f2', marginTop: 5, borderRadius: 5 },
-  tripText: { fontSize: 16 },
+  searchButton: { 
+    backgroundColor: '#fff', 
+    padding: 15, 
+    borderRadius: 25, 
+    alignItems: 'center', 
+    marginBottom: 20 
+  },
+  searchText: { 
+    color: '#6200EE', 
+    fontWeight: 'bold', 
+    fontSize: 18 
+  },
+  recentHeader: { 
+    fontSize: 20, 
+    fontWeight: 'bold', 
+    color: '#fff', 
+    marginBottom: 10 
+  },
+  tripItem: { 
+    padding: 12, 
+    backgroundColor: '#fff', 
+    marginTop: 10, 
+    borderRadius: 10, 
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 2 }, 
+    shadowOpacity: 0.1, 
+    shadowRadius: 5, 
+    elevation: 5 
+  },
+  tripText: { 
+    fontSize: 16, 
+    color: '#333' 
+  },
 });
 
 export default HomeScreen;
