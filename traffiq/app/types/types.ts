@@ -16,9 +16,13 @@ export type Coordinates = {
       mode: string;
       startCoords: Coordinates;
       destinationCoords: Coordinates;
-      travelTime: number;
+      travelTime: number; // Expected in minutes
       destination: string;
       startAddress: string;
+      // Optional parameters for custom routes
+      isCustomRoute?: boolean;
+      customDirections?: string[];
+      customPolyline?: Coordinates[];
     };
     SavedScreen: undefined;
     Main: undefined; 
@@ -29,6 +33,16 @@ export type BottomTabParamList = {
     Saved: undefined;
     Bus: undefined; 
     Settings: undefined;
+};
+
+export interface CustomRouteData {
+  id: string;
+  startName: string; 
+  destinationName: string; 
+  startCoords: Coordinates; 
+  polyline: Coordinates[]; 
+  directions: string[];   
+  estimatedTime: number; 
 };
 
 export type IoniconName =
